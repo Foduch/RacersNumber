@@ -10,6 +10,7 @@ except ImportError:
     from tkinter.simpledialog import *## notice lowercase 't' in tkinter here
     
 import requests
+from datetime import datetime
 
 def getRaces():
     '''Получает список всех гонок по ключу доступа организатора
@@ -34,6 +35,8 @@ def getRacers(raceStageGuid):
     racers = dict()
     for item in data['data']['raceStageRegistrations']:
         racer = dict()
+        birth = datetime.strptime(item['account']["birthday"], "%Y-%m-%dT%H:%M:%S")
+        racer.update({'age': str(datetime.now().year - birth.year)})
         racer.update({'firstName': item['account']['firstName']})
         racer.update({'lastName': item['account']['lastName']})
         racer.update({'number': item['registrationNumber']})
@@ -78,7 +81,7 @@ def table(racers):
         key = item[1]
         frame = Frame(fr) #Изменил привязку root на fr
         
-        Label(frame, text = str(racers[key]['lastName'] + ' ' + racers[key]['firstName'])).pack(side = 'left', expand = YES)
+        Label(frame, text = str(racers[key]['lastName'] + ' ' + racers[key]['firstName'] + ' ' + racers[key]['age'])).pack(side = 'left', expand = YES)
         LNum = Label(frame, text = str(racers[key]['number']))
         Button(frame, text = 'Удалить', command = lambda g = key, x = LNum: setNum(g, '', x)).pack(side='right')
         Button(frame, text = 'Изменить', command = lambda g = key, x = LNum: setNum(g, askinteger('', ''), x)).pack(side='right')       
