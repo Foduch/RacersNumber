@@ -23,7 +23,6 @@ raceStageGuid = '461d1fa4-e720-48fd-a280-e545edea051d'
     apiFuncs.update({'RaceStages':'RaceStages/List'})
     url = '{0}{1}?accessKey={2}'.format(apiSiteName, apiFuncs[apiFunc], accessKey)
     return url'''
-
 def ErrorInternetConnection():
     showerror(title = 'Ошибка', message = 'Не возможно выполнить запрос. Проверьте интернет соединение')
 
@@ -105,11 +104,17 @@ def table(racers):
     for item in temp:
         key = item[1]
         frame = Frame(fr) #Изменил привязку root на fr
-        
-        Label(frame, text = str(racers[key]['lastName'] + ' ' + racers[key]['firstName'] + ' ' + racers[key]['age'])).pack(side = 'left', expand = YES)
+        racerInfo = str(racers[key]['lastName'] + ' ' + racers[key]['firstName'] + ' (' + racers[key]['age'] + ')')
+        Label(frame, text = racerInfo).pack(side = 'left', expand = YES)
         LNum = Label(frame, text = str(racers[key]['number']))
-        Button(frame, text = 'Удалить', command = lambda g = key, x = LNum: setNum(g, '', x)).pack(side='right')
-        Button(frame, text = 'Изменить', command = lambda g = key, x = LNum: setNum(g, askinteger('', ''), x)).pack(side='right')       
+
+        butDel = Button(frame, text = 'Удалить')
+        butDel.config(command = lambda g = key, x = LNum:( setNum(g, '', x) if askyesno(
+            title = 'Удалить', message = ('Удалить номер для '+racerInfo+'?')) else None))
+        butDel.pack(side='right')
+        Button(frame, text = 'Изменить', command = lambda g = key, x = LNum: setNum(g, askinteger(
+            'Изменение номера', ('Введите номер для '+racerInfo)), x)).pack(side='right')
+        
         LNum.pack(side = 'left')
         frame.pack(fill = BOTH)
         
