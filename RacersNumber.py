@@ -11,37 +11,60 @@ except ImportError:
     
 import requests
 from datetime import datetime
+import sys
+
+
+apiSiteName = 'http://api.chrono.zelbike.ru/v1/'
+accessKey='qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
+raceStageGuid = '461d1fa4-e720-48fd-a280-e545edea051d'
+
+'''def getRequestUrl(apiFunc, accessKey):
+    apiFuncs = dict()
+    apiFuncs.update({'RaceStages':'RaceStages/List'})
+    url = '{0}{1}?accessKey={2}'.format(apiSiteName, apiFuncs[apiFunc], accessKey)
+    return url'''
+
+def ErrorInternetConnection():
+    showerror(title = 'Ошибка', message = 'Не возможно выполнить запрос. Проверьте интернет соединение')
 
 def getRaces():
     '''Получает список всех гонок по ключу доступа организатора
        Формирует словарь в виде guid:Название'''
     url = 'http://api.chrono.zelbike.ru/v1/RaceStages/List?accessKey=qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
-    data = requests.get(url).json()["data"]
-    dRaces = dict()
-    for item in data:
-        firstName = str(item["race"]["displayNamePrimary"]) #Cup Name
-        if item["displayNamePrimary"]:
-            secondName = '\t' + str(item["displayNamePrimary"]) #Stage Name
-        raceName = firstName + secondName
-        dRaces.update({item["guid"]:raceName}) #Adding race in dictionary
-    return dRaces
+    try:
+        data = requests.get(url).json()["data"]
+        dRaces = dict()
+        for item in data:
+            firstName = str(item["race"]["displayNamePrimary"]) #Cup Name
+            if item["displayNamePrimary"]:
+                secondName = '\t' + str(item["displayNamePrimary"]) #Stage Name
+            raceName = firstName + secondName
+            dRaces.update({item["guid"]:raceName}) #Adding race in dictionary
+        return dRaces
+    except:
+        ErrorInternetConnection()
+        sys.exit()
 
 def getRacers(raceStageGuid):
     '''Получение списка зарегестрированных участников на конкретную гонку
        Словарь вида  guid: { имя, фамилия, номер}'''
     url = 'http://api.chrono.zelbike.ru/v1/RaceStages/Details?accessKey=qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
     url = url + '&raceStageGuid=' + raceStageGuid
-    data = requests.get(url).json()
-    racers = dict()
-    for item in data['data']['raceStageRegistrations']:
-        racer = dict()
-        birth = datetime.strptime(item['account']["birthday"], "%Y-%m-%dT%H:%M:%S")
-        racer.update({'age': str(datetime.now().year - birth.year)})
-        racer.update({'firstName': item['account']['firstName']})
-        racer.update({'lastName': item['account']['lastName']})
-        racer.update({'number': item['registrationNumber']})
-        racers.update({item['guid']: racer})
-    return racers
+    try:
+        data = requests.get(url).json()
+        racers = dict()
+        for item in data['data']['raceStageRegistrations']:
+            racer = dict()
+            birth = datetime.strptime(item['account']["birthday"], "%Y-%m-%dT%H:%M:%S")
+            racer.update({'age': str(datetime.now().year - birth.year)})
+            racer.update({'firstName': item['account']['firstName']})
+            racer.update({'lastName': item['account']['lastName']})
+            racer.update({'number': item['registrationNumber']})
+            racers.update({item['guid']: racer})
+        return racers
+    except:
+        ErrorInternetConnection()
+        sys.exit()
 
 '''def selectRace(dRaces):
     def f(key):
@@ -54,6 +77,7 @@ def getRacers(raceStageGuid):
         Button(fr, text = dRaces[key], command = lambda : f(key)).pack() 
     fr.pack()
 '''
+
 def setNum(guid, num, LNum):
     if num == None:
         return
@@ -64,13 +88,14 @@ def setNum(guid, num, LNum):
     url += '&raceStageRegistrationGuid='
     url += guid
     url += '&registrationNumber=' + str(num)
-    inf = requests.get(url).json()
-    if inf['isSuccess']:
-        LNum.config(text = str(num))
-    else:
-        showerror(title = 'Error', message = inf['message'])
-   
-    
+    try:
+        inf = requests.get(url).json()
+        if inf['isSuccess']:
+            LNum.config(text=str(num))
+        else:
+            showerror(title='Error', message=inf['message'])
+    except:
+        ErrorInternetConnection()
 
 def table(racers):
     temp = list()
@@ -88,9 +113,6 @@ def table(racers):
         LNum.pack(side = 'left')
         frame.pack(fill = BOTH)
         
-
-
-raceStageGuid = '461d1fa4-e720-48fd-a280-e545edea051d'
 root = Tk()
 
 #Далее идет новый код для возможности прокрутки
@@ -106,8 +128,7 @@ def conf(event):
 fr.bind('<Configure>', conf)
 #Конец вставки
 
-
-dRaces = getRaces()
+#dRaces = getRaces()
 racers = getRacers(raceStageGuid)
 table(racers)
 
