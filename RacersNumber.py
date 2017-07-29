@@ -109,12 +109,12 @@ def table(racers):
         LNum = Label(frame, text = str(racers[key]['number']))
 
         butDel = Button(frame, text = 'Удалить')
-        butDel.config(command = lambda g = key, x = LNum:( setNum(g, '', x) if askyesno(
-            title = 'Удалить', message = ('Удалить номер для '+racerInfo+'?')) else None))
+        butDel.config(command = lambda g = key, x = LNum, r = racerInfo:( setNum(g, '', x) if askyesno(
+            title = 'Удалить', message = ('Удалить номер для '+r+'?')) else None))
         butDel.pack(side='right')
-        Button(frame, text = 'Изменить', command = lambda g = key, x = LNum: setNum(g, askinteger(
-            'Изменение номера', ('Введите номер для '+racerInfo)), x)).pack(side='right')
-        
+        Button(frame, text = 'Изменить', command = lambda g = key, x = LNum, r = racerInfo: setNum(g, askinteger(
+            'Изменение номера', ('Введите номер для '+r)), x)).pack(side='right')
+
         LNum.pack(side = 'left')
         frame.pack(fill = BOTH)
         
