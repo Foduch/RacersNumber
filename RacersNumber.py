@@ -16,7 +16,8 @@ import sys
 
 apiSiteName = 'http://api.chrono.zelbike.ru/v1/'
 accessKey='qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
-raceStageGuid = '461d1fa4-e720-48fd-a280-e545edea051d'
+#raceStageGuid = '461d1fa4-e720-48fd-a280-e545edea051d'
+raceStageGuid = '04e29e6a-b68b-4e0e-9a5c-787f3fcf2e92'
 
 '''def getRequestUrl(apiFunc, accessKey):
     apiFuncs = dict()
