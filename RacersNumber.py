@@ -10,61 +10,35 @@ except ImportError:
     from tkinter.simpledialog import *## notice lowercase 't' in tkinter here
     
 import requests
-from datetime import datetime
-import sys
-
-
-apiSiteName = 'http://api.chrono.zelbike.ru/v1/'
-accessKey='qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
-#raceStageGuid = '461d1fa4-e720-48fd-a280-e545edea051d'
-raceStageGuid = '04e29e6a-b68b-4e0e-9a5c-787f3fcf2e92'
-
-'''def getRequestUrl(apiFunc, accessKey):
-    apiFuncs = dict()
-    apiFuncs.update({'RaceStages':'RaceStages/List'})
-    url = '{0}{1}?accessKey={2}'.format(apiSiteName, apiFuncs[apiFunc], accessKey)
-    return url'''
-def ErrorInternetConnection():
-    showerror(title = 'Ошибка', message = 'Не возможно выполнить запрос. Проверьте интернет соединение')
 
 def getRaces():
     '''Получает список всех гонок по ключу доступа организатора
        Формирует словарь в виде guid:Название'''
     url = 'http://api.chrono.zelbike.ru/v1/RaceStages/List?accessKey=qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
-    try:
-        data = requests.get(url).json()["data"]
-        dRaces = dict()
-        for item in data:
-            firstName = str(item["race"]["displayNamePrimary"]) #Cup Name
-            if item["displayNamePrimary"]:
-                secondName = '\t' + str(item["displayNamePrimary"]) #Stage Name
-            raceName = firstName + secondName
-            dRaces.update({item["guid"]:raceName}) #Adding race in dictionary
-        return dRaces
-    except:
-        ErrorInternetConnection()
-        sys.exit()
+    data = requests.get(url).json()["data"]
+    dRaces = dict()
+    for item in data:
+        firstName = str(item["race"]["displayNamePrimary"]) #Cup Name
+        if item["displayNamePrimary"]:
+            secondName = '\t' + str(item["displayNamePrimary"]) #Stage Name
+        raceName = firstName + secondName
+        dRaces.update({item["guid"]:raceName}) #Adding race in dictionary
+    return dRaces
 
 def getRacers(raceStageGuid):
     '''Получение списка зарегестрированных участников на конкретную гонку
        Словарь вида  guid: { имя, фамилия, номер}'''
     url = 'http://api.chrono.zelbike.ru/v1/RaceStages/Details?accessKey=qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
     url = url + '&raceStageGuid=' + raceStageGuid
-    try:
-        data = requests.get(url).json()
-        racers = dict()
-        for item in data['data']['raceStageRegistrations']:
-            racer = dict()
-            birth = datetime.strptime(item['account']["birthday"], "%Y-%m-%dT%H:%M:%S")
-            racer.update({'age': str(datetime.now().year - birth.year)})
-            racer.update({'firstName': item['account']['firstName']})
-            racer.update({'lastName': item['account']['lastName']})
-            racer.update({'number': item['registrationNumber']})
-            racers.update({item['guid']: racer})
-        return racers
-    except:
-        ErrorInternetConnection()
-        sys.exit()
+    data = requests.get(url).json()
+    racers = dict()
+    for item in data['data']['raceStageRegistrations']:
+        racer = dict()
+        racer.update({'firstName': item['account']['firstName']})
+        racer.update({'lastName': item['account']['lastName']})
+        racer.update({'number': item['registrationNumber']})
+        racers.update({item['guid']: racer})
+    return racers
 
 '''def selectRace(dRaces):
     def f(key):
@@ -77,7 +51,6 @@ def getRacers(raceStageGuid):
         Button(fr, text = dRaces[key], command = lambda : f(key)).pack() 
     fr.pack()
 '''
-
 def setNum(guid, num, LNum):
     if num == None:
         return
@@ -88,16 +61,20 @@ def setNum(guid, num, LNum):
     url += '&raceStageRegistrationGuid='
     url += guid
     url += '&registrationNumber=' + str(num)
-    try:
-        inf = requests.get(url).json()
-        if inf['isSuccess']:
-            LNum.config(text=str(num))
-        else:
-            showerror(title='Error', message=inf['message'])
-    except:
-        ErrorInternetConnection()
+    inf = requests.get(url).json()
+    if inf['isSuccess']:
+        LNum.config(text = str(num))
+    else:
+        showerror(title = 'Error', message = inf['message'])
+   
+    
 
 def table(racers):
+    frame = Frame(fr)
+    lbf = Label(frame, text = str(data['data'][n]['race']['displayNamePrimary']) + ' ' + 
+        str(data['data'][n]['displayNamePrimary']))
+    lbf.pack(side = 'left')
+    frame.pack(side = 'top', fill = BOTH)
     temp = list()
     for key in racers.keys():
         temp.append([racers[key]['lastName'], key])
@@ -105,20 +82,37 @@ def table(racers):
     for item in temp:
         key = item[1]
         frame = Frame(fr) #Изменил привязку root на fr
-        racerInfo = str(racers[key]['lastName'] + ' ' + racers[key]['firstName'] + ' (' + racers[key]['age'] + ')')
-        Label(frame, text = racerInfo).pack(side = 'left', expand = YES)
+        
+        Label(frame, text = str(racers[key]['lastName'] + ' ' + racers[key]['firstName'])).pack(side = 'left', expand = YES)
         LNum = Label(frame, text = str(racers[key]['number']))
-
-        butDel = Button(frame, text = 'Удалить')
-        butDel.config(command = lambda g = key, x = LNum, r = racerInfo:( setNum(g, '', x) if askyesno(
-            title = 'Удалить', message = ('Удалить номер для '+r+'?')) else None))
-        butDel.pack(side='right')
-        Button(frame, text = 'Изменить', command = lambda g = key, x = LNum, r = racerInfo: setNum(g, askinteger(
-            'Изменение номера', ('Введите номер для '+r)), x)).pack(side='right')
-
+        Button(frame, text = 'Удалить', command = lambda g = key, x = LNum: setNum(g, '', x)).pack(side='right')
+        Button(frame, text = 'Изменить', command = lambda g = key, x = LNum: setNum(g, askinteger('', ''), x)).pack(side='right')       
         LNum.pack(side = 'left')
         frame.pack(fill = BOTH)
         
+
+
+#raceStageGuid = '461d1fa4-e720-48fd-a280-e545edea051d'
+
+
+#raceStageGuid = '884ae33c-298a-4e68-8c58-7a652fdb11d9'
+
+main_api = 'http://api.chrono.zelbike.ru/v1/RaceStages/'
+
+adress = 'List?accessKey=qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
+url = main_api + adress
+
+data = requests.get(url).json()
+#print(data)
+
+#print()
+#print(data['data'])
+for i in range(len(data['data'])):
+    print(str(i) + ' ' + data['data'][i]['race']['displayNamePrimary'] + ' ' + str(data['data'][i]['displayNamePrimary']) + ' '
+     + data['data'][i]['guid'])
+
+n = int(input())
+raceStageGuid = data['data'][n]['guid']
 root = Tk()
 
 #Далее идет новый код для возможности прокрутки
@@ -134,7 +128,8 @@ def conf(event):
 fr.bind('<Configure>', conf)
 #Конец вставки
 
-#dRaces = getRaces()
+
+dRaces = getRaces()
 racers = getRacers(raceStageGuid)
 table(racers)
 
