@@ -2,6 +2,58 @@ from tkinter import *
 from datetime import datetime
 #import urllib.parse
 import requests
+import time
+import logging
+
+class StopWatch(Frame):  
+    """ Implements a stop watch frame widget. """                                                                
+    def __init__(self, parent=None, **kw):        
+        Frame.__init__(self, parent, kw)
+        self._start = 0.0        
+        self._elapsedtime = 0.0
+        self._running = 0
+        self.timestr = StringVar()               
+        self.makeWidgets()      
+
+    def makeWidgets(self):                         
+        """ Make the time label. """
+        l = Label(self, textvariable=self.timestr)
+        self._setTime(self._elapsedtime)
+        l.pack(fill=X, expand=NO, pady=2, padx=2)                      
+    
+    def _update(self): 
+        """ Update the label with elapsed time. """
+        self._elapsedtime = time.time() - self._start
+        self._setTime(self._elapsedtime)
+        self._timer = self.after(50, self._update)
+    
+    def _setTime(self, elap):
+        """ Set the time string to Minutes:Seconds:Hundreths """
+        minutes = int(elap/60)
+        seconds = int(elap - minutes*60.0)
+        hseconds = int((elap - minutes*60.0 - seconds)*100)                
+        self.timestr.set('%02d:%02d:%02d' % (minutes, seconds, hseconds))
+        
+    def Start(self):                                                     
+        """ Start the stopwatch, ignore if running. """
+        if not self._running:            
+            self._start = time.time() - self._elapsedtime
+            self._update()
+            self._running = 1        
+    
+    def Stop(self):                                    
+        """ Stop the stopwatch, ignore if stopped. """
+        if self._running:
+            self.after_cancel(self._timer)            
+            self._elapsedtime = time.time() - self._start    
+            self._setTime(self._elapsedtime)
+            self._running = 0
+    
+    def Reset(self):                                  
+        """ Reset the stopwatch. """
+        self._start = time.time()         
+        self._elapsedtime = 0.0    
+        self._setTime(self._elapsedtime)
 
 
 def getRacers(raceStageGuid):
@@ -16,20 +68,32 @@ def getRacers(raceStageGuid):
         racers.update({item['registrationNumber']: racer})
     return racers
 
-def f(registrationNumber, frame, butt):
+def f(registrationNumber, frame, butt, sw):
+    sw.Start()
     d = '["' + datetime.now().strftime("%Y-%m-%dT%H:%M:%S") + '"]'
-    l = Label(frame, text = d[2:-2])
+    #l = Label(frame, text = d[2:-2])
     butt.config(state = 'disabled')
-    requests.get(url1 + str(registrationNumber) + '&customStartDateTime=' + d).json()
-    l.pack(side = 'left')
+    resp = requests.get(url1 + str(registrationNumber) + '&customStartDateTime=' + d).json()
+    #l.pack(side = 'left')
+    logging.info(str(registrationNumber) + ' start ' + d[2:-2])
+    if resp['isSuccess']:
+        logging.info('status OK')
+    else:
+        logging.info('status ERROR')
 
-def f1(registrationNumber, frame, butt):
+def f1(registrationNumber, frame, butt, sw):
+    sw.Stop()
     d = '["' + datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S") + '"]'
-    l = Label(frame, text = d[2:-2])
+    #l = Label(frame, text = d[2:-2])
     butt.config(state = 'disabled')
-    requests.get(url1 + str(registrationNumber) + '&lapsDateTimeJson=' + d).json()
-    l.pack(side = 'left')  
-
+    resp = requests.get(url1 + str(registrationNumber) + '&lapsDateTimeJson=' + d).json()
+    #l.pack(side = 'left')
+    logging.info(str(registrationNumber) + ' finish ' + d[2:-2])
+    if resp['isSuccess']:
+        logging.info('status OK')
+    else:
+        logging.info('status ERROR')
+        
 def table(racers):
     frame = Frame(fr)
     lbf = Label(frame, text = str(data['data'][n]['race']['displayNamePrimary']) + ' ' + 
@@ -53,15 +117,21 @@ def table(racers):
         
         Label(frame, text = str(k)).pack(side = 'left')
         Label(frame, text = str(racers[k]['lastName'] + ' ' + racers[k]['firstName'])).pack(side = 'left')
+        sw = StopWatch(frame)
+        sw.pack(side='right')
         fin = Button(frame, text = 'Финиш')
-        fin.config( command = lambda x = k, y = frame, z = fin:f1(x, y, z))
+        fin.config( command = lambda x = k, y = frame,
+                    z = fin, s = sw:f1(x, y, z, s))
         fin.pack(side = 'right')
-
+        
         st = Button(frame, text = 'Старт')
-        st.config( command = lambda x = k, y = frame, z = st:f(x, y, z))
+        st.config( command = lambda x = k, y = frame,
+                   z = st, s = sw:f(x, y, z, s))
         st.pack(side = 'right')
         frame.pack(side = 'top', fill = BOTH)
 
+logging.basicConfig(filename="TK.log", level=logging.INFO)
+logging.info('run programm '+datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S"))
 
 main_api = 'http://api.chrono.zelbike.ru/v1/RaceStages/'
 
