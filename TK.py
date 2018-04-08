@@ -152,6 +152,18 @@ raceStageGuid = data['data'][n]['guid']
 
 root = Tk()
 
+
+frame = Frame(root)
+sw = StopWatch(frame)
+sw.pack(side = 'top', fill = BOTH)
+frame.pack(side = 'top', fill = BOTH)
+
+frame = Frame(root)
+Button(frame, text='Start', command=sw.Start).pack(side=LEFT)
+Button(frame, text='Stop', command=sw.Stop).pack(side=LEFT)
+Button(frame, text='Reset', command=sw.Reset).pack(side=LEFT)
+frame.pack(side = 'top', fill = BOTH)
+
 canvas = Canvas(root)
 fr = Frame(canvas)
 myscrollbar = Scrollbar(root, orient = 'vertical', command = canvas.yview)
