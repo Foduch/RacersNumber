@@ -17,6 +17,8 @@ from datetime import *
 import serial
 import threading
 import sqlite3
+from messages import *
+import os
 
 class Report(Frame):
     def __init__(self, parent, *args, **kwargs):
@@ -169,12 +171,13 @@ class Api:
         data = requests.get(url).json()
         try:
             if data['res'] == 'ok':
-                return 'Гонка началась {0}'.format(str(datetime.now())[:19])
+                return '{0} {1}'.format(MESSAGE_RACE_BEGAN, \
+                    str(datetime.now())[:19])
         except:
             pass
         try:
             if data['error'] == 'Already running':
-                return 'Гонка уже идет'
+                return MESSAGE_RACE_ALREADY_RUNNING
         except:
             pass
 
@@ -197,8 +200,12 @@ class Database:
 
 
 def main():
-    global key
-    key = input('Введие ключ доступа к Zelbike: ')
+    
+    global ZELBIKE_ACCESS_KEY
+    try:
+        ZELBIKE_ACCESS_KEY = os.environ['ZELBIKE_ACCESS_KEY'] 
+    except:
+        ZELBIKE_ACCESS_KEY = input(MESSAGE_ENTER_ZELBIKE_ACCESS_KEY)
     conn = sqlite3.connect("vahat.db") # или :memory: чтобы сохранить в RAM
     cursor = conn.cursor()
     # Создание таблицы
@@ -227,58 +234,66 @@ def main():
 
 
 def ChoiceWindow(cursor):
-    def butCallback1():
+    def refereeing_window():
         global races
         global api
-        race=races[cb.current()]
-        race.add_racers(api.get_racers(race))
-        root.destroy()
-        MainWindow(api, race, cursor)
+        if choice_race_combobox.current() == -1:
+            showerror('', MESSAGE_NO_RACE_SELECTED)
+        else:
+            race=races[choice_race_combobox.current()]
+            race.add_racers(api.get_racers(race))
+            root.destroy()
+            MainWindow(api, race, cursor)
 
-    def butCallback2():
+    def set_number_window():
         global races
         global api
-        race=races[cb.current()]
-        race.add_racers(api.get_racers(race))
-        root.destroy()
-        SetNumbersWindow(api, race, cursor)
+        if choice_race_combobox.current() == -1:
+            showerror('', MESSAGE_NO_RACE_SELECTED)
+        else:
+            race=races[choice_race_combobox.current()]
+            race.add_racers(api.get_racers(race))
+            root.destroy()
+            SetNumbersWindow(api, race, cursor)
 
-    def butCallback3():
-        if choice_api.current() == -1:
-            showerror('', 'API не выбрано')
+    def get_races_func():
+        if choice_api_combobox.current() == -1:
+            showerror('', MESSAGE_NO_API_SELECTED)
         else:
             global api
-            api = apies[choice_api.current()]
+            api = apies[choice_api_combobox.current()]
             global races
             races = api.get_races()
-            cb['values'] = races
-            cb.update()
+            choice_race_combobox['values'] = races
+            choice_race_combobox.update()
 
     root = Tk()
     apies = [Api('Vahat', 'http://127.0.0.1:8000/api/'),\
         Api('Zelbike', 'http://api.chrono.zelbike.ru/v1/RaceStages/')]
 
-    apies[1].key = key
+    apies[1].key = ZELBIKE_ACCESS_KEY
 
     races = []
-    choice_api = ttk.Combobox(root, values=[str(x) for x in apies])
-    cb = ttk.Combobox(root, values=races)
+    choice_api_combobox = ttk.Combobox(root, values=[str(x) for x in apies])
+    choice_race_combobox = ttk.Combobox(root, values=races)
 
     x = (root.winfo_screenwidth() - root.winfo_reqwidth()) / 2
     y = (root.winfo_screenheight() - root.winfo_reqheight()) / 2
     root.wm_geometry("+%d+%d" % (x, y))
     root.geometry("480x340")
     
-    load_races_button = Button(root, text = 'Получить гонки', command = butCallback3)
-
-    choice_api.pack(padx = 10, pady = 10)
+    load_races_button = Button(root, text = LABEL_GET_RACES_BUTTON, command = get_races_func)
+    Label(text = LABEL_CHOICE_API).pack()
+    choice_api_combobox.pack(padx = 10, pady = 10)
     load_races_button.pack(padx = 10, pady = 10)
 
-    # choice_button1 = Button(root, text="Судейство", command = butCallback1)
-    choice_button2 = Button(root, text="Выдача номеров", command = butCallback2)
-    cb.pack(fill = BOTH, padx = 20, pady = 20)
-    # choice_button1.pack(pady = 10)
-    choice_button2.pack(pady = 10)
+    # refereeing_button = Button(root, text="Судейство", command = refereeing_window)
+    set_number_button = Button(root, text=LABEL_SET_NUMBERS_BUTTON, \
+        command = set_number_window)
+    Label(text = LABEL_CHOICE_RACE).pack()
+    choice_race_combobox.pack(fill = BOTH, padx = 20, pady = 20)
+    # refereeing_button.pack(pady = 10)
+    set_number_button.pack(pady = 10)
     
     # race=races[cb.current()]
     # db = Database()
@@ -314,7 +329,8 @@ def MainWindow(api, race, cursor):
 
             log_frame.write('{0} {1}'.format(str(dt)[:19], \
                 number))
-            cursor.execute("""SELECT * FROM Points where (num = :num and race_id = :race_id)
+            cursor.execute("""SELECT num, race_id, dt FROM Points 
+                where (num = :num and race_id = :race_id)
                 ORDER BY dt desc
                 """, {"num": number, "race_id": race.get_id()})
             res = cursor.fetchall()
@@ -356,7 +372,7 @@ def MainWindow(api, race, cursor):
     # fr.bind('<Configure>', conf)
     #Конец вставки
     
-    Button(root, text = 'Start race', command = lambda r = race, a = api,\
+    Button(root, text = LABEL_START_RACE_BUTTON, command = lambda r = race, a = api,\
         l = log_frame: StartRace(a, r, l)).pack(
         padx  = 10, pady = 10)
     
@@ -388,7 +404,7 @@ def SetNumbersWindow(api, race, cursor):
     def set_number(race, racer, number, number_label):
         #Обертка для апи, чтобы была возможность изенять номера на экране
         if api.set_number(race, racer, number):
-            showerror(title = 'Error', message = 'Ошибка')
+            showerror(title = TITLE_ERROR_WINDOW, message = MESSAGE_NUMBER_DIDNT_SET)
         else:
             number_label.config(text = str(number))
 
@@ -404,9 +420,10 @@ def SetNumbersWindow(api, race, cursor):
         frame = Frame(fr)
         Label(frame, text = str(racer)).pack(side = 'left', expand = YES, padx = 10)
         number_label = Label(frame, text = racer.get_number())
-        Button(frame, text = 'Изменить', command = lambda r = race, x = racer,
+        Button(frame, text = LABEL_CHANGE_NUMBER_BUTTON, \
+            command = lambda r = race, x = racer,\
              nl = number_label: set_number(
-            r, x, askinteger('Изменение номера', ''), nl)).pack(side='right')
+            r, x, askinteger(TITLE_CHANGE_NUMBER_WINDOW, ''), nl)).pack(side='right')
         number_label.pack(side = 'left', padx = 10)
         frame.pack(fill = BOTH, pady = 5)
 
