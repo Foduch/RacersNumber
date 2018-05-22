@@ -14,7 +14,7 @@ import requests
 def getRaces():
     '''Получает список всех гонок по ключу доступа организатора
        Формирует словарь в виде guid:Название'''
-    url = 'http://api.chrono.zelbike.ru/v1/RaceStages/List?accessKey=qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
+    url = 'http://api.chrono.zelbike.ru/v1/RaceStages/List?accessKey=ixieMol8lO6KebB5fOFOzObbfWjwIo67'
     data = requests.get(url).json()["data"]
     dRaces = dict()
     for item in data:
@@ -28,7 +28,7 @@ def getRaces():
 def getRacers(raceStageGuid):
     '''Получение списка зарегестрированных участников на конкретную гонку
        Словарь вида  guid: { имя, фамилия, номер}'''
-    url = 'http://api.chrono.zelbike.ru/v1/RaceStages/Details?accessKey=qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
+    url = 'http://api.chrono.zelbike.ru/v1/RaceStages/Details?accessKey=ixieMol8lO6KebB5fOFOzObbfWjwIo67'
     url = url + '&raceStageGuid=' + raceStageGuid
     data = requests.get(url).json()
     racers = dict()
@@ -54,7 +54,7 @@ def getRacers(raceStageGuid):
 def setNum(guid, num, LNum):
     if num == None:
         return
-    url = 'http://api.chrono.zelbike.ru/v1/RaceStages/SetRegistrationNumber?accessKey=qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
+    url = 'http://api.chrono.zelbike.ru/v1/RaceStages/SetRegistrationNumber?accessKey=ixieMol8lO6KebB5fOFOzObbfWjwIo67'
     url += '&raceStageGuid='
     global raceStageGuid
     url += raceStageGuid
@@ -99,13 +99,13 @@ def table(racers):
 
 main_api = 'http://api.chrono.zelbike.ru/v1/RaceStages/'
 
-adress = 'List?accessKey=qFfiYkJIolAtj6dSLVuVrYjITV8v9axRfzU6mc4Bd4'
+adress = 'List?accessKey=ixieMol8lO6KebB5fOFOzObbfWjwIo67'
 url = main_api + adress
 
 data = requests.get(url).json()
-#print(data)
+# print(data)
 
-#print()
+# print()
 #print(data['data'])
 for i in range(len(data['data'])):
     print(str(i) + ' ' + data['data'][i]['race']['displayNamePrimary'] + ' ' + str(data['data'][i]['displayNamePrimary']) + ' '
