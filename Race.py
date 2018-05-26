@@ -89,6 +89,24 @@ class Race:
     def get_id(self):
         return str(self.id)
 
+class Point:
+    def __init__(self, race, number, dt):
+        self.race = race
+        self.number = number
+        self.dt = dt
+
+    def get_str_dt(self):
+        return self.dt[:19]
+
+    def get_datetime_dt(self):
+        return datetime.strptime(self.dt[:19], '%Y-%m-%d %H:%M:%S')
+
+    def get_number(self):
+        return self.number
+
+    def get_race(self):
+        return self.race
+
 class Api:
     def __init__(self, name, url):
         self.name = name
@@ -166,49 +184,113 @@ class Api:
                 pass
 
     def start_race(self, race):
-        url = self.url + 'start_race?race_id={0}&dtime={1}'.format(
-            race.get_id(), str(datetime.now())[:19])
-        data = requests.get(url).json()
-        try:
-            if data['res'] == 'ok':
-                return '{0} {1}'.format(MESSAGE_RACE_BEGAN, \
-                    str(datetime.now())[:19])
-        except:
-            pass
-        try:
-            if data['error'] == 'Already running':
-                return MESSAGE_RACE_ALREADY_RUNNING
-        except:
-            pass
+        if self.name == 'Vahat':
+            url = self.url + 'start_race?race_id={0}&dtime={1}'.format(
+                race.get_id(), str(datetime.now())[:19])
+            data = requests.get(url).json()
+            try:
+                if data['res'] == 'ok':
+                    return '{0} {1}'.format(MESSAGE_RACE_BEGAN, \
+                        str(datetime.now())[:19])
+            except:
+                pass
+            try:
+                if data['error'] == 'Already running':
+                    return MESSAGE_RACE_ALREADY_RUNNING
+            except:
+                pass
+        elif self.name == 'Zelbike':
+            return '{0} {1}'.format(MESSAGE_RACE_BEGAN, \
+                        str(datetime.now())[:19])
 
-    def set_point(self, race, number, dt):
-        url = self.url + 'set_point?race_id={0}&num={1}&dtime={2}'.format(\
-            race.get_id(), number, str(dt)[:19])
-        data = requests.get(url).json()
+    def set_point(self, race, number, dt, db, conn):
+        if self.name == 'Vahat':
+            url = self.url + 'set_point?race_id={0}&num={1}&dtime={2}'.format(\
+                race.get_id(), number, str(dt)[:19])
+            data = requests.get(url).json()
+        elif self.name == 'Zelbike':
+            points = db.get_points(conn, race, number)
+            if points == -1:
+                pass
+            else:
+                urlsuffix = '['
+
+                for i in range(1, len(points)+1):
+                    tmp = '"{0}T{1}", '.format(points[-i].get_str_dt()[:10], \
+                        points[-i].get_str_dt()[11:19])
+                    urlsuffix += tmp
+                urlsuffix = urlsuffix[:len(urlsuffix)-2] + ']'
+                url = self.url + 'UpdateLaps?accessKey={0}&raceStageGuid={1}\
+                &registrationNumber={2}&lapsDateTimeJson={3}'.format(
+                    self.key, race.get_id(), number, urlsuffix)
+                data = requests.get(url).json()
+                print(data)
+
 
 class Database:
 
     database = "vahat.db"
 
-    def incert_racers(self, api, race):
-        conn = sqlite3.connect(self.database)
+    # def incert_racers(self, api, race):
+    #     conn = sqlite3.connect(self.database)
+    #     cursor = conn.cursor()
+    #     racers = api.get_racers(race)
+    #     print(racers)
+
+    def get_points(self, conn, race, number):
         cursor = conn.cursor()
-        racers = api.get_racers(race)
-        print(racers)
+        cursor.execute("""SELECT dt FROM Points 
+                where (num = :num and race_id = :race_id)
+                ORDER BY dt desc
+                """, {"num": number, "race_id": race.get_id()})
+        points = []
+        for item in cursor.fetchall():
+            points.append(Point(race, number, item[0]))
+        if len(points) == 0:
+            return -1
+        else:
+            return points
+
+    def insert_start(self, conn, race, dt):
+        cursor = conn.cursor()
+        cursor.execute("""INSERT INTO Points values (
+                        :num, :race_id, :dt)""", {"num": '-1',
+                        "race_id": race.get_id(), "dt": dt})
+        conn.commit()
+
+    def get_start_point(self, conn, race):
+        cursor = conn.cursor()
+        cursor.execute("""SELECT dt FROM Points 
+                where (num = :num and race_id = :race_id)
+                """, {"num": '-1', "race_id": race.get_id()})
+        try:
+            start = Point(race, '-1', cursor.fetchall()[0][0])
+            return start
+        except:
+            return -1
+
+    def insert_point(self, conn, race, number, dt):
+        cursor = conn.cursor()
+        cursor.execute("""INSERT INTO Points values (
+                        :num, :race_id, :dt)""", {"num": number,
+                        "race_id": race.get_id(), "dt": dt})
+        conn.commit()
+
+
+
 
 
 
 
 def main():
-    
+
     global ZELBIKE_ACCESS_KEY
     try:
         ZELBIKE_ACCESS_KEY = os.environ['ZELBIKE_ACCESS_KEY'] 
     except:
         ZELBIKE_ACCESS_KEY = input(MESSAGE_ENTER_ZELBIKE_ACCESS_KEY)
-    conn = sqlite3.connect("vahat.db") # или :memory: чтобы сохранить в RAM
+    conn = sqlite3.connect("vahat.db") 
     cursor = conn.cursor()
-    # Создание таблицы
     try:
         cursor.execute("""CREATE TABLE Races
                       (id text, name text)
@@ -244,6 +326,7 @@ def ChoiceWindow(cursor):
             race.add_racers(api.get_racers(race))
             root.destroy()
             MainWindow(api, race, cursor)
+            # pass
 
     def set_number_window():
         global races
@@ -287,37 +370,35 @@ def ChoiceWindow(cursor):
     choice_api_combobox.pack(padx = 10, pady = 10)
     load_races_button.pack(padx = 10, pady = 10)
 
-    # refereeing_button = Button(root, text="Судейство", command = refereeing_window)
+    refereeing_button = Button(root, text="Судейство", command = refereeing_window)
     set_number_button = Button(root, text=LABEL_SET_NUMBERS_BUTTON, \
         command = set_number_window)
     Label(text = LABEL_CHOICE_RACE).pack()
     choice_race_combobox.pack(fill = BOTH, padx = 20, pady = 20)
-    # refereeing_button.pack(pady = 10)
+    refereeing_button.pack(pady = 10)
     set_number_button.pack(pady = 10)
     
     # race=races[cb.current()]
     # db = Database()
     # Button(text = "Получить гонщиков", command = lambda \
     #     r=race, a=api: db.incert_racers(a, r)).pack()
-    
-    
 
     root.mainloop()
 
 def MainWindow(api, race, cursor):
 
-    def StartRace(api, race, log_frame):
+    def StartRace(api, race, log_frame, conn):
         status = api.start_race(race)
         log_frame.write(status)
+        db.insert_start(conn, race, datetime.now())
         t = threading.Thread(target=ReadTag)
         t.daemon = True
         t.start()
   
-
-    ser = serial.Serial('COM6', 9600)
     def ReadTag():
-        conn = sqlite3.connect("vahat.db") # или :memory: чтобы сохранить в RAM
+        conn = sqlite3.connect("vahat.db")
         cursor = conn.cursor()
+        
         while(ser.is_open == True):
             rfidtag = ''
             incomingByte = ser.read(3)
@@ -327,28 +408,31 @@ def MainWindow(api, race, cursor):
             number = str(race.tags[rfidtag])
             dt = datetime.now()
 
-            log_frame.write('{0} {1}'.format(str(dt)[:19], \
-                number))
-            cursor.execute("""SELECT num, race_id, dt FROM Points 
-                where (num = :num and race_id = :race_id)
-                ORDER BY dt desc
-                """, {"num": number, "race_id": race.get_id()})
-            res = cursor.fetchall()
-            try:
-                d = datetime.strptime(res[0][2][:19], '%Y-%m-%d %H:%M:%S')
-                if (dt-d) > timedelta(0, 0 , 0, 0, 1, 0, 0):
-                    cursor.execute("""INSERT INTO Points values (
-                        :num, :race_id, :dt)""", {"num": number,
-                        "race_id": race.get_id(), "dt": dt})
-                    conn.commit()
-                    api.set_point(race, number, dt)
+            
 
-            except:
-                cursor.execute("""INSERT INTO Points values (
-                        :num, :race_id, :dt)""", {"num": number,
-                        "race_id": race.get_id(), "dt": dt})
-                conn.commit()
-                api.set_point(race, number, dt)
+            points = db.get_points(conn, race, number)
+            if points == -1:
+                start = db.get_start_point(conn, race)
+                if start == -1:
+                    pass
+                else:
+                    d = start.get_datetime_dt()
+                    if (dt-d) > timedelta(0, 0 , 0, 0, 1, 0, 0):
+                        db.insert_point(conn, race, number, dt)
+                        api.set_point(race, number, dt, db, conn)
+                        log_frame.write('{0} {1}'.format(str(dt)[:19], number))
+            else:
+                d = points[0].get_datetime_dt()
+                if (dt-d) > timedelta(0, 0 , 0, 0, 1, 0, 0):
+                    db.insert_point(conn, race, number, dt)
+                    api.set_point(race, number, dt, db, conn)
+                    log_frame.write('{0} {1}'.format(str(dt)[:19], number))
+
+                # cursor.execute("""INSERT INTO Points values (
+                #         :num, :race_id, :dt)""", {"num": number,
+                #         "race_id": race.get_id(), "dt": dt})
+                # conn.commit()
+                # api.set_point(race, number, dt)
                     # print(str(race.tags[rfidtag]))
             log_frame.update()
 
@@ -357,26 +441,15 @@ def MainWindow(api, race, cursor):
     y = (root.winfo_screenheight() - root.winfo_reqheight()) / 2
     root.wm_geometry("+%d+%d" % (x, y))
     log_frame = Report(root)
-    
 
-    #Далее идет код для возможности прокрутки
-    # canvas = Canvas(root)
-    # fr = Frame(canvas)
-    # myscrollbar = Scrollbar(root, orient = 'vertical', command = canvas.yview)
-    # canvas.configure(yscrollcommand = myscrollbar.set)
-    # myscrollbar.pack(side = 'right', fill = Y)
-    # canvas.pack(side = 'left', fill=BOTH)
-    # canvas.create_window((0, 0), window = fr, anchor = 'nw')
-    # def conf(event):
-    #     canvas.configure(scrollregion = canvas.bbox('all'))
-    # fr.bind('<Configure>', conf)
-    #Конец вставки
+    db = Database()
+    ser = serial.Serial('COM6', 9600)
+    conn = sqlite3.connect("vahat.db")    
     
     Button(root, text = LABEL_START_RACE_BUTTON, command = lambda r = race, a = api,\
-        l = log_frame: StartRace(a, r, l)).pack(
+        l = log_frame, c = conn: StartRace(a, r, l, c)).pack(
         padx  = 10, pady = 10)
     
-
     log_frame.pack()
     root.title(str(race) + ' ' + race.get_id())
     root.mainloop()
