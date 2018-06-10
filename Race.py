@@ -19,6 +19,7 @@ import threading
 import sqlite3
 from messages import *
 import os
+import Settings
 
 class Report(Frame):
     def __init__(self, parent, *args, **kwargs):
@@ -65,12 +66,12 @@ class Racer:
 
 class Race:
 
-    tags = {"96182208": 1, "96182240": 2, "9618336": 3, "9618324": 4, \
-    "9618332": 5, "96182172": 6, "96182212": 7, "96182220": 8, "96182168": 9}
+    tags = Settings.TagsIntoNumbers
 
-    def __init__(self, name, race_id):
+    def __init__(self, name, race_id, start_datetime):
         self.name = name
         self.id = race_id
+        self.start_datetime = start_datetime
         self.racers = list()
         
     def __str__(self):
@@ -84,10 +85,16 @@ class Race:
             self.add_racer(racer)
 
     def get_racers(self):
-        return self.racers
+        return list(self.racers)
 
     def get_id(self):
         return str(self.id)
+
+    def get_start(self):
+        return str(self.start_datetime)
+
+    def get_start_dt(self):
+        return self.start_datetime
 
 class Point:
     def __init__(self, race, number, dt):
@@ -121,7 +128,7 @@ class Api:
             data = requests.get(self.url + 'get_races').json()
             result = []
             for item in data['res']:
-                race = Race(item['name'], item['id'])
+                race = Race(item['name'], item['id'], datetime.now())
                 result.append(race)
             return result
         elif self.name == 'Zelbike':
@@ -133,7 +140,9 @@ class Api:
                 if item["displayNamePrimary"]:
                     second_name = '\t' + str(item["displayNamePrimary"]) #Stage Name
                 race_name = first_name + second_name
-                race = Race(race_name, item["guid"])
+                start_datetime = datetime.strptime(item['startDateTime'],\
+                 '%Y-%m-%dT%H:%M:%S')
+                race = Race(race_name, item["guid"], start_datetime)
                 result.append(race)
             return result
 
@@ -224,18 +233,43 @@ class Api:
                 &registrationNumber={2}&lapsDateTimeJson={3}'.format(
                     self.key, race.get_id(), number, urlsuffix)
                 data = requests.get(url).json()
-                print(data)
 
 
 class Database:
 
-    database = "vahat.db"
+    DBName = Settings.DBName
 
     # def incert_racers(self, api, race):
     #     conn = sqlite3.connect(self.database)
     #     cursor = conn.cursor()
     #     racers = api.get_racers(race)
     #     print(racers)
+
+    def insert_races(self, races):
+        conn = sqlite3.connect(self.DBName)
+        cursor = conn.cursor()
+        for race in races:
+            cursor.execute("""SELECT id from Races
+            where (id = :race_id)
+            """, {"race_id": race.get_id()})
+            if len(cursor.fetchall()) == 0:
+                cursor.execute("""INSERT INTO Races values
+                    (:race_id, :name, :start)
+                    """, {"race_id": race.get_id(), "name": str(race),
+                    "start": race.get_start()})
+                conn.commit()
+
+    def get_races(self):
+        conn = sqlite3.connect(self.DBName)
+        cursor = conn.cursor()
+        cursor.execute("""SELECT id, name, start from Races
+            """)
+        races = []
+        for item in cursor.fetchall():
+            start_datetime = datetime.strptime(item[2], '%Y-%m-%d %H:%M:%S')
+            race = Race(item[1], item[0], start_datetime)
+            races.append(race)
+        return races
 
     def get_points(self, conn, race, number):
         cursor = conn.cursor()
@@ -289,11 +323,11 @@ def main():
         ZELBIKE_ACCESS_KEY = os.environ['ZELBIKE_ACCESS_KEY'] 
     except:
         ZELBIKE_ACCESS_KEY = input(MESSAGE_ENTER_ZELBIKE_ACCESS_KEY)
-    conn = sqlite3.connect("vahat.db") 
+    conn = sqlite3.connect(Settings.DBName) 
     cursor = conn.cursor()
     try:
         cursor.execute("""CREATE TABLE Races
-                      (id text, name text)
+                      (id text, name text, start text)
                    """)
     except:
         pass
@@ -319,44 +353,54 @@ def ChoiceWindow(cursor):
     def refereeing_window():
         global races
         global api
-        if choice_race_combobox.current() == -1:
-            showerror('', MESSAGE_NO_RACE_SELECTED)
+        # if choice_race_combobox.current() == -1:
+        #     showerror('', MESSAGE_NO_RACE_SELECTED)
+        # else:
+        api = apies[1]
+        race=races[choice_race_combobox.current()]
+        if (datetime.now()-race.get_start_dt()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
+            showerror('', MESSAGE_RACE_FINISHED)
+        elif (race.get_start_dt()-datetime.now()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
+            showerror('', MESSAGE_RACE_NOT_START)
         else:
-            race=races[choice_race_combobox.current()]
             race.add_racers(api.get_racers(race))
             root.destroy()
             MainWindow(api, race, cursor)
-            # pass
+        # pass
 
     def set_number_window():
         global races
         global api
-        if choice_race_combobox.current() == -1:
-            showerror('', MESSAGE_NO_RACE_SELECTED)
-        else:
-            race=races[choice_race_combobox.current()]
-            race.add_racers(api.get_racers(race))
-            root.destroy()
-            SetNumbersWindow(api, race, cursor)
+        # if choice_race_combobox.current() == -1:
+        #     showerror('', MESSAGE_NO_RACE_SELECTED)
+        # else:
+        api = apies[1]
+        race=races[choice_race_combobox.current()]
+        race.add_racers(api.get_racers(race))
+        root.destroy()
+        SetNumbersWindow(api, race, cursor)
 
     def get_races_func():
-        if choice_api_combobox.current() == -1:
-            showerror('', MESSAGE_NO_API_SELECTED)
-        else:
-            global api
-            api = apies[choice_api_combobox.current()]
-            global races
-            races = api.get_races()
-            choice_race_combobox['values'] = races
-            choice_race_combobox.update()
+        # if choice_api_combobox.current() == -1:
+        #     showerror('', MESSAGE_NO_API_SELECTED)
+        # else:
+        global api
+        # api = apies[choice_api_combobox.current()]
+        api = apies[1]
+        global races
+        races = api.get_races()
+        db.insert_races(races)
+        choice_race_combobox['values'] = races
+        choice_race_combobox.update()
 
     root = Tk()
     apies = [Api('Vahat', 'http://127.0.0.1:8000/api/'),\
         Api('Zelbike', 'http://api.chrono.zelbike.ru/v1/RaceStages/')]
+    db = Database()
+    global races
+    races = db.get_races()
 
     apies[1].key = ZELBIKE_ACCESS_KEY
-
-    races = []
     choice_api_combobox = ttk.Combobox(root, values=[str(x) for x in apies])
     choice_race_combobox = ttk.Combobox(root, values=races)
 
@@ -366,8 +410,8 @@ def ChoiceWindow(cursor):
     root.geometry("480x340")
     
     load_races_button = Button(root, text = LABEL_GET_RACES_BUTTON, command = get_races_func)
-    Label(text = LABEL_CHOICE_API).pack()
-    choice_api_combobox.pack(padx = 10, pady = 10)
+    # Label(text = LABEL_CHOICE_API).pack()
+    # choice_api_combobox.pack(padx = 10, pady = 10)
     load_races_button.pack(padx = 10, pady = 10)
 
     refereeing_button = Button(root, text="Судейство", command = refereeing_window)
@@ -396,7 +440,7 @@ def MainWindow(api, race, cursor):
         t.start()
   
     def ReadTag():
-        conn = sqlite3.connect("vahat.db")
+        conn = sqlite3.connect(Settings.DBName)
         cursor = conn.cursor()
         
         while(ser.is_open == True):
@@ -405,7 +449,10 @@ def MainWindow(api, race, cursor):
             for i in incomingByte:
                 rfidtag = rfidtag + str(i)
 
-            number = str(race.tags[rfidtag])
+            try:
+                number = str(race.tags[rfidtag])
+            except:
+                continue
             dt = datetime.now()
 
             
@@ -443,8 +490,8 @@ def MainWindow(api, race, cursor):
     log_frame = Report(root)
 
     db = Database()
-    ser = serial.Serial('COM6', 9600)
-    conn = sqlite3.connect("vahat.db")    
+    ser = serial.Serial(Settings.COMPortName, Settings.COMBaudRate)
+    conn = sqlite3.connect(Settings.DBName)    
     
     Button(root, text = LABEL_START_RACE_BUTTON, command = lambda r = race, a = api,\
         l = log_frame, c = conn: StartRace(a, r, l, c)).pack(
