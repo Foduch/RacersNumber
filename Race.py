@@ -124,6 +124,9 @@ class Api:
         return self.name
 
     def get_races(self):
+        '''Получает данные о гонках с сервера.
+        Возвращает список объектов класса Race.
+        При отсутсвии подключение к Интернет выдается ошибка в консоль'''
         if self.name == 'Vahat':
             data = requests.get(self.url + 'get_races').json()
             result = []
@@ -218,10 +221,27 @@ class Api:
                 race.get_id(), number, str(dt)[:19])
             data = requests.get(url).json()
         elif self.name == 'Zelbike':
-            points = db.get_points(conn, race, number)
+            points = db.get_points(db, race, number)
             if points == -1:
                 pass
             else:
+                urlsuffix = '['
+
+                for i in range(1, len(points)+1):
+                    tmp = '"{0}T{1}", '.format(points[-i].get_str_dt()[:10], \
+                        points[-i].get_str_dt()[11:19])
+                    urlsuffix += tmp
+                urlsuffix = urlsuffix[:len(urlsuffix)-2] + ']'
+                url = self.url + 'UpdateLaps?accessKey={0}&raceStageGuid={1}\
+                &registrationNumber={2}&lapsDateTimeJson={3}'.format(
+                    self.key, race.get_id(), number, urlsuffix)
+                data = requests.get(url).json()
+
+    def upload_points(self, race, db):
+        if self.name == 'Zelbike':
+            numbers = db.get_numbers(race)
+            for number in numbers:
+                points = db.get_points(db, race, number)
                 urlsuffix = '['
 
                 for i in range(1, len(points)+1):
@@ -271,7 +291,8 @@ class Database:
             races.append(race)
         return races
 
-    def get_points(self, conn, race, number):
+    def get_points(self, db, race, number):
+        conn = sqlite3.connect(self.DBName)
         cursor = conn.cursor()
         cursor.execute("""SELECT dt FROM Points 
                 where (num = :num and race_id = :race_id)
@@ -285,12 +306,36 @@ class Database:
         else:
             return points
 
+    def get_numbers(self, race):
+        conn = sqlite3.connect(self.DBName)
+        cursor = conn.cursor()
+        cursor.execute("""SELECT num FROM Points
+            WHERE (race_id = :race_id)""",
+            {"race_id": race.get_id()})
+        numbers = set()
+        tmp = cursor.fetchall()
+        if len(tmp) == 0:
+            return numbers
+        for item in tmp:
+            for number in item:
+                if number != '-1':
+                    numbers.add(number)
+        return numbers
+
     def insert_start(self, conn, race, dt):
         cursor = conn.cursor()
-        cursor.execute("""INSERT INTO Points values (
-                        :num, :race_id, :dt)""", {"num": '-1',
-                        "race_id": race.get_id(), "dt": dt})
-        conn.commit()
+        cursor.execute("""SELECT dt FROM Points
+            WHERE (num = -1 and race_id == :race_id)""",
+            {"race_id": race.get_id()})
+        tmp = cursor.fetchall()
+        if len(tmp) == 0:
+            cursor.execute("""INSERT INTO Points values (
+                            :num, :race_id, :dt)""", {"num": '-1',
+                            "race_id": race.get_id(), "dt": dt})
+            conn.commit()
+            return dt
+        elif len(tmp) == 1:
+            return datetime.strptime(tmp[0][0][:19], '%Y-%m-%d %H:%M:%S')
 
     def get_start_point(self, conn, race):
         cursor = conn.cursor()
@@ -358,14 +403,14 @@ def ChoiceWindow(cursor):
         # else:
         api = apies[1]
         race=races[choice_race_combobox.current()]
-        if (datetime.now()-race.get_start_dt()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
-            showerror('', MESSAGE_RACE_FINISHED)
-        elif (race.get_start_dt()-datetime.now()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
-            showerror('', MESSAGE_RACE_NOT_START)
-        else:
-            race.add_racers(api.get_racers(race))
-            root.destroy()
-            MainWindow(api, race, cursor)
+        # if (datetime.now()-race.get_start_dt()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
+        #     showerror('', MESSAGE_RACE_FINISHED)
+        # elif (race.get_start_dt()-datetime.now()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
+        #     showerror('', MESSAGE_RACE_NOT_START)
+        # else:
+        #     race.add_racers(api.get_racers(race))
+        #     root.destroy()
+        MainWindow(api, race, cursor)
         # pass
 
     def set_number_window():
@@ -432,12 +477,51 @@ def ChoiceWindow(cursor):
 def MainWindow(api, race, cursor):
 
     def StartRace(api, race, log_frame, conn):
-        status = api.start_race(race)
+        # status = api.start_race(race)
+        # log_frame.write(status)
+        start_time = db.insert_start(conn, race, datetime.now())
+        status = str(start_time) + ' ' + MESSAGE_RACE_START
         log_frame.write(status)
-        db.insert_start(conn, race, datetime.now())
+        db.get_numbers(race)
         t = threading.Thread(target=ReadTag)
         t.daemon = True
         t.start()
+
+    def AddPoint():
+        def callback():
+            try:
+                number = int(entry_number.get())
+            except:
+                showerror('', MESSAGE_INVALID_NUMBER)
+                entry_number.delete(0, END)
+                return
+            dt = str(datetime.today())[:10]
+            dt = dt + ' ' + entry_datetime.get()
+            try:
+                dt = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
+            except:
+                showerror('', MESSAGE_INVALID_TIME)
+                entry_datetime.delete(0, END)
+                return
+            db.insert_point(conn, race, number, dt)
+            showinfo('', MESSAGE_POINT_ADD)
+            entry_number.delete(0, END)
+            entry_datetime.delete(0, END)
+            root.destroy()
+
+        root = Tk()
+        x = (root.winfo_screenwidth() - root.winfo_reqwidth()) / 2
+        y = (root.winfo_screenheight() - root.winfo_reqheight()) / 2
+        root.wm_geometry("+%d+%d" % (x, y))
+        Label(root, text=LABEL_ENTER_NUMBER).pack(padx=10, pady=10)
+        entry_number = Entry(root)
+        entry_number.pack(padx=10, pady=10)
+        Label(root, text=LABEL_ENTER_TIME).pack(padx=10, pady=10)
+        entry_datetime = Entry(root)
+        entry_datetime.pack(padx=10, pady=10)
+        Button(root, text=LABEL_ADD, command=callback).pack(padx=10, pady=10)
+
+        root.mainloop()
   
     def ReadTag():
         conn = sqlite3.connect(Settings.DBName)
@@ -455,9 +539,7 @@ def MainWindow(api, race, cursor):
                 continue
             dt = datetime.now()
 
-            
-
-            points = db.get_points(conn, race, number)
+            points = db.get_points(db, race, number)
             if points == -1:
                 start = db.get_start_point(conn, race)
                 if start == -1:
@@ -495,9 +577,12 @@ def MainWindow(api, race, cursor):
     
     Button(root, text = LABEL_START_RACE_BUTTON, command = lambda r = race, a = api,\
         l = log_frame, c = conn: StartRace(a, r, l, c)).pack(
-        padx  = 10, pady = 10)
+        padx=10, pady=10)
     
     log_frame.pack()
+    Button(root, text=LABEL_UPLOAD_POINTS_FOR_ALL, command=lambda r=race, d=db:\
+        api.upload_points(r, d)).pack(padx=10, pady=10, side='left')
+    Button(root, text=LABEL_ADD_POINT, command=AddPoint).pack(padx=10, pady=10, side='right')
     root.title(str(race) + ' ' + race.get_id())
     root.mainloop()
     
