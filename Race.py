@@ -407,14 +407,14 @@ def ChoiceWindow(cursor):
         # else:
         api = apies[1]
         race=races[choice_race_combobox.current()]
-        # if (datetime.now()-race.get_start_dt()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
-        #     showerror('', MESSAGE_RACE_FINISHED)
-        # elif (race.get_start_dt()-datetime.now()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
-        #     showerror('', MESSAGE_RACE_NOT_START)
-        # else:
-        #     race.add_racers(api.get_racers(race))
-        #     root.destroy()
-        MainWindow(api, race, cursor)
+        if (datetime.now()-race.get_start_dt()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
+            showerror('', MESSAGE_RACE_FINISHED)
+        elif (race.get_start_dt()-datetime.now()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
+            showerror('', MESSAGE_RACE_NOT_START)
+        else:
+            race.add_racers(api.get_racers(race))
+            root.destroy()
+            MainWindow(api, race, cursor)
         # pass
 
     def set_number_window():
