@@ -358,6 +358,15 @@ class Database:
         logging.info(MESSAGE_POINT_ADDED+' {0} {1} {2}'.format(\
             number, dt, race.get_id()))
 
+    def delete_point(self, point):
+        conn = sqlite3.connect(self.DBName)
+        cursor = conn.cursor()
+        cursor.execute("""DELETE FROM Points
+            WHERE (num = :num and race_id = :race_id and dt = :dt)""",
+            {"num": point.get_number(), "race_id": point.get_race().get_id(),
+            "dt": point.get_datetime_dt()})
+        conn.commit()
+
 
 
 
@@ -407,14 +416,14 @@ def ChoiceWindow(cursor):
         # else:
         api = apies[1]
         race=races[choice_race_combobox.current()]
-        if (datetime.now()-race.get_start_dt()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
-            showerror('', MESSAGE_RACE_FINISHED)
-        elif (race.get_start_dt()-datetime.now()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
-            showerror('', MESSAGE_RACE_NOT_START)
-        else:
-            race.add_racers(api.get_racers(race))
-            root.destroy()
-            MainWindow(api, race, cursor)
+        # if (datetime.now()-race.get_start_dt()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
+        #     showerror('', MESSAGE_RACE_FINISHED)
+        # elif (race.get_start_dt()-datetime.now()) > timedelta(0, 0 , 2, 0, 0, 0, 0):
+        #     showerror('', MESSAGE_RACE_NOT_START)
+        # else:
+        #     race.add_racers(api.get_racers(race))
+        #     root.destroy()
+        MainWindow(api, race, cursor)
         # pass
 
     def set_number_window():
@@ -496,7 +505,7 @@ def MainWindow(api, race, cursor):
             try:
                 number = int(entry_number.get())
             except:
-                showerror('', MESSAGE_INVALID_NUMBER)
+                showerror('', MESSAGE_INVALID_NUMBER, parent=root)
                 entry_number.delete(0, END)
                 return
             dt = str(datetime.today())[:10]
@@ -504,11 +513,11 @@ def MainWindow(api, race, cursor):
             try:
                 dt = datetime.strptime(dt, '%Y-%m-%d %H:%M:%S')
             except:
-                showerror('', MESSAGE_INVALID_TIME)
+                showerror('', MESSAGE_INVALID_TIME, parent=root)
                 entry_datetime.delete(0, END)
                 return
             db.insert_point(conn, race, number, dt)
-            showinfo('', MESSAGE_POINT_ADD)
+            showinfo('', MESSAGE_POINT_ADD, parent=root)
             entry_number.delete(0, END)
             entry_datetime.delete(0, END)
             root.destroy()
@@ -525,6 +534,46 @@ def MainWindow(api, race, cursor):
         entry_datetime.pack(padx=10, pady=10)
         Button(root, text=LABEL_ADD, command=callback).pack(padx=10, pady=10)
 
+        root.mainloop()
+
+    def DeletePoints():
+        def table_of_points():
+            def delete_point(dt_label, point):
+                if askyesno('', MESSAGE_ASK_DELETE, parent=root):
+                    dt_label.config(text='Удалено')
+                    db.delete_point(point)
+
+            try:
+                fr.destroy()
+            except:
+                pass
+            root.update()
+            fr = Frame(root)
+            for point in points:
+                frame = Frame(fr)
+                Label(frame, text = str(point.get_number())).pack(\
+                    side = 'left', expand=YES, padx=10)
+                dt_label = Label(frame, text=str(point.get_datetime_dt()))
+                dt_label.pack(side = 'left', padx = 10)
+                Button(frame, text=LABEL_DELETE,\
+                    command=lambda t=dt_label, p=point: delete_point(\
+                    t, p)).pack(side = 'right', padx = 10)
+                frame.pack(fill = BOTH, pady = 5)
+            fr.pack()
+
+        number = askinteger('', LABEL_ENTER_NUMBER)
+        if number > 0:
+            number = str(number)
+        else:
+            showerror('', MESSAGE_INVALID_NUMBER)
+            return
+        root = Tk()
+        x = (root.winfo_screenwidth() - root.winfo_reqwidth()) / 2
+        y = (root.winfo_screenheight() - root.winfo_reqheight()) / 2
+        root.wm_geometry("+%d+%d" % (x, y))
+        points = db.get_points(db, race, number)
+        table_of_points()
+        
         root.mainloop()
   
     def ReadTag():
@@ -586,6 +635,8 @@ def MainWindow(api, race, cursor):
     log_frame.pack()
     Button(root, text=LABEL_UPLOAD_POINTS_FOR_ALL, command=lambda r=race, d=db:\
         api.upload_points(r, d)).pack(padx=10, pady=10, side='left')
+    Button(root, text=LABEL_CHANGE_POINTS, command=DeletePoints).pack(\
+        padx=10, pady=10, side='right')
     Button(root, text=LABEL_ADD_POINT, command=AddPoint).pack(padx=10, pady=10, side='right')
     root.title(str(race) + ' ' + race.get_id())
     root.mainloop()
@@ -613,7 +664,8 @@ def SetNumbersWindow(api, race, cursor):
     def set_number(race, racer, number, number_label):
         #Обертка для апи, чтобы была возможность изенять номера на экране
         if api.set_number(race, racer, number):
-            showerror(title = TITLE_ERROR_WINDOW, message = MESSAGE_NUMBER_DIDNT_SET)
+            showerror(title=TITLE_ERROR_WINDOW, message=MESSAGE_NUMBER_DIDNT_SET, \
+                parent=root)
         else:
             number_label.config(text = str(number))
 
