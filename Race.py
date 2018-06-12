@@ -13,6 +13,7 @@ except ImportError:
     ## notice lowercase 't' in tkinter here
     
 import requests
+import logging
 from datetime import *
 import serial
 import threading
@@ -354,6 +355,8 @@ class Database:
                         :num, :race_id, :dt)""", {"num": number,
                         "race_id": race.get_id(), "dt": dt})
         conn.commit()
+        logging.info(MESSAGE_POINT_ADDED+' {0} {1} {2}'.format(\
+            number, dt, race.get_id()))
 
 
 
@@ -363,6 +366,7 @@ class Database:
 
 def main():
 
+    logging.basicConfig(filename="sample.log", level=logging.INFO)
     global ZELBIKE_ACCESS_KEY
     try:
         ZELBIKE_ACCESS_KEY = os.environ['ZELBIKE_ACCESS_KEY'] 
