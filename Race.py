@@ -422,7 +422,7 @@ def ChoiceWindow(cursor):
         #     showerror('', MESSAGE_RACE_NOT_START)
         # else:
         #     race.add_racers(api.get_racers(race))
-        #     root.destroy()
+        root.destroy()
         MainWindow(api, race, cursor)
         # pass
 
@@ -599,15 +599,15 @@ def MainWindow(api, race, cursor):
                     pass
                 else:
                     d = start.get_datetime_dt()
-                    if (dt-d) > timedelta(0, 0 , 0, 0, 1, 0, 0):
+                    if (dt-d) > timedelta(0, 0 , 0, 0, 5, 0, 0):
                         db.insert_point(conn, race, number, dt)
-                        api.set_point(race, number, dt, db, conn)
+                        # api.set_point(race, number, dt, db, conn)
                         log_frame.write('{0} {1}'.format(str(dt)[:19], number))
             else:
                 d = points[0].get_datetime_dt()
-                if (dt-d) > timedelta(0, 0 , 0, 0, 1, 0, 0):
+                if (dt-d) > timedelta(0, 0 , 0, 0, 5, 0, 0):
                     db.insert_point(conn, race, number, dt)
-                    api.set_point(race, number, dt, db, conn)
+                    # api.set_point(race, number, dt, db, conn)
                     log_frame.write('{0} {1}'.format(str(dt)[:19], number))
 
                 # cursor.execute("""INSERT INTO Points values (
