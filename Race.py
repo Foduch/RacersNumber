@@ -307,16 +307,18 @@ def MainWindow(api, race, cursor):
                     pass
                 else:
                     d = start.get_datetime_dt()
-                    if (dt-d) > timedelta(0, 0 , 0, 0, 5, 0, 0):
+                    if (dt-d) > timedelta(0, 0 , 0, 0, 1, 0, 0):
                         db.insert_point(conn, race, number, dt)
                         # api.set_point(race, number, dt, db, conn)
                         log_frame.write('{0} {1}'.format(str(dt)[:19], number))
             else:
                 d = points[0].get_datetime_dt()
-                if (dt-d) > timedelta(0, 0 , 0, 0, 5, 0, 0):
+                if (dt-d) > timedelta(0, 0 , 0, 0, 1, 0, 0):
                     db.insert_point(conn, race, number, dt)
                     # api.set_point(race, number, dt, db, conn)
                     log_frame.write('{0} {1}'.format(str(dt)[:19], number))
+            logging.info('Считывание номера {0} {1} {2}'.format( \
+                        number, dt, race.get_id()))
 
                 # cursor.execute("""INSERT INTO Points values (
                 #         :num, :race_id, :dt)""", {"num": number,
